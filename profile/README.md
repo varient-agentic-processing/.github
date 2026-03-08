@@ -106,3 +106,9 @@ Cloud Run . Compute Engine (ClickHouse, n2-highmem-8) . Cloud Batch . Cloud Work
 ## Tech Stack
 
 Python . FastAPI . Next.js . ClickHouse . Anthropic Claude . Model Context Protocol . Pulumi . bcftools . WireGuard
+
+---
+
+## Getting Started
+
+Step-by-step deployment instructions across all repos: [INSTALL.md](../INSTALL.md)
