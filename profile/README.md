@@ -1,5 +1,7 @@
 # Genomic Variant Platform
 
+> **Work in progress.** This platform is under active development and not yet complete.
+
 A cloud-native genomic variant analysis platform with an agentic natural language query interface. Built on GCP, ClickHouse, and the Model Context Protocol (MCP).
 
 ---
@@ -73,15 +75,15 @@ All services run on GCP, all traffic stays inside a private VPC, and the only en
 
 ---
 
-## Key Design Decisions
+## Design Rationale
 
-**ClickHouse over OpenSearch** — the variant workload is analytical and columnar: per-individual scans of millions of rows, range queries, and cohort aggregations. ClickHouse's MergeTree sort key and vectorised execution handle this an order of magnitude more efficiently than an inverted-index document store. Separate `variants` and `annotations` tables allow ClinVar to be refreshed monthly without touching variant call data.
+**ClickHouse for analytical genomics** — the variant workload is columnar by nature: per-individual scans of millions of rows, range queries, and cohort aggregations. ClickHouse's MergeTree sort key and vectorised execution are a natural fit. Separate `variants` and `annotations` tables allow ClinVar to be refreshed monthly without touching variant call data.
 
-**MCP as the query interface** — the MCP service exposes six tools that the agent uses through multi-hop reasoning. The tool interface is datastore-agnostic: names, descriptions, and schemas are independent of ClickHouse internals, so the backend can evolve without changing the agent layer.
+**MCP as the agent's data interface** — the MCP service exposes six structured tools that the agent uses through multi-hop reasoning. Names, descriptions, and schemas are independent of ClickHouse internals, so the storage layer can evolve without touching the agent.
 
-**All services internal, VPN-only access** — no public Cloud Run endpoints, no external IPs. WireGuard is the single entry point. This eliminates the wide attack surface of the v1 SSH-based approach.
+**Private-by-default networking** — no public Cloud Run endpoints, no external IPs. All services run with `ingress: internal` inside a private VPC. WireGuard is the single ingress point, keeping the attack surface minimal.
 
-**Pulumi over Terraform** — infrastructure is written in Python, the same language as every other repo. Real loops, functions, type hints, and pytest for infra tests — no HCL DSL context-switching.
+**Infrastructure as Python with Pulumi** — every service in this platform is written in Python, and the infrastructure is no different. Pulumi gives real loops, functions, type hints, and pytest for infra tests with no DSL context-switching.
 
 ---
 
@@ -106,3 +108,9 @@ Cloud Run . Compute Engine (ClickHouse, n2-highmem-8) . Cloud Batch . Cloud Work
 ## Tech Stack
 
 Python . FastAPI . Next.js . ClickHouse . Anthropic Claude . Model Context Protocol . Pulumi . bcftools . WireGuard
+
+---
+
+## Getting Started
+
+Step-by-step deployment instructions across all repos: [INSTALL.md](../INSTALL.md)
