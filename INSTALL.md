@@ -1,6 +1,6 @@
 # Installation
 
-Deploy in order: **infra → variant-pipeline → clinvar-pipeline → workflow-service**. Each repo depends on the one before it.
+Deploy in order: **infra → variant-pipeline → clinvar-pipeline → workflow-service → variant-mcp-server → agent-service → vap-ui**. Each repo depends on the one before it.
 
 ---
 
@@ -228,3 +228,176 @@ curl -X POST http://localhost:8080/pipelines \
   -H 'Content-Type: application/json' \
   -d '{"type": "clinvar_refresh"}'
 ```
+
+---
+
+## 5. variant-mcp-server
+
+MCP server that exposes six genomic query tools over Streamable HTTP. The agent-service connects to this to run ClickHouse queries.
+
+**Requires:** infra deployed, ClickHouse loaded with variants and annotations, VPN connected.
+
+### Install and deploy
+
+```bash
+cd variant-mcp-server
+cp .env.example .env
+# Edit .env: set GCP_PROJECT and PULUMI_CONFIG_PASSPHRASE_FILE
+
+poetry install
+
+# First time only:
+poetry run poe login
+poetry run poe stack-init
+
+# Build Docker image and deploy:
+poetry run poe build
+poetry run poe deploy
+```
+
+### Run locally
+
+```bash
+poetry run uvicorn src.server:app --reload --port 8081
+```
+
+Health check: `curl http://localhost:8081/health`
+
+### Cost management
+
+The service has `min_instance_count=1` to eliminate cold starts. Scale to zero when not in use:
+
+```bash
+poetry run poe mcp-stop   # scale min instances to 0
+poetry run poe mcp-start  # restore min instances to 1
+```
+
+---
+
+## 6. agent-service
+
+FastAPI service that runs a Claude reasoning loop over the MCP variant server. Accepts natural-language questions and returns answers as a Server-Sent Events stream.
+
+**Requires:** variant-mcp-server deployed and reachable, `anthropic-api-key` secret in Secret Manager (set by `infra poe secrets-push`), VPN connected.
+
+### Install and deploy
+
+```bash
+cd agent-service
+cp .env.example .env
+# Edit .env:
+#   GCP_PROJECT=<your-project-id>
+#   MCP_SERVER_URL=<Cloud Run URL of variant-mcp-server>
+#   PULUMI_CONFIG_PASSPHRASE_FILE=<same passphrase file as infra/>
+
+poetry install
+
+# First time only:
+poetry run poe login
+poetry run poe stack-init
+
+# Build Docker image and deploy:
+poetry run poe build
+poetry run poe deploy
+```
+
+### Run locally
+
+```bash
+# Requires VPN to reach the deployed MCP server
+poetry run uvicorn src.main:app --reload --port 8080
+```
+
+Health check: `curl http://localhost:8080/health`
+Returns `{"status":"ok","tools":<n>}` — the tool count confirms MCP connectivity.
+
+### Query the agent
+
+Use the interactive script at the workspace root (requires `pip install httpx`):
+
+```bash
+# Against deployed service (must be on VPN):
+python ask.py
+
+# Against local:
+python ask.py --url http://localhost:8080
+```
+
+Or POST directly:
+
+```bash
+curl -X POST https://<agent-service-url>/query \
+  -H 'Content-Type: application/json' \
+  -d '{"question": "What pathogenic variants does HG002 have in BRCA2?"}' \
+  --no-buffer
+```
+
+The response is an SSE stream. Events: `tool_call`, `tool_result`, `answer`, `error`, `done`.
+
+---
+
+## 7. vap-ui
+
+Browser-based internal tool — pipeline management, agent query, and cohort dashboard. Proxies requests to workflow-service, agent-service, and variant-mcp-server via Next.js rewrites.
+
+**Requires:** infra deployed (including `poe up` with the new `vap-ui-sa` service account), all upstream services deployed, VPN connected.
+
+### One-time infra update
+
+The `vap-ui-sa` service account was added to `infra/iam.py`. If infra was deployed before this repo existed, re-apply it:
+
+```bash
+cd infra && poetry run poe up
+```
+
+### Install and deploy
+
+```bash
+cd vap-ui
+cp .env.example .env
+# Edit .env: set GCP_PROJECT and PULUMI_CONFIG_PASSPHRASE_FILE
+```
+
+`.env` for deploy (no local dev values needed for deployment):
+
+```
+GCP_PROJECT=variant-processing
+PULUMI_CONFIG_PASSPHRASE_FILE=/path/to/passphrase-file
+```
+
+```bash
+poetry install
+
+# First time only:
+poetry run poe login
+poetry run poe stack-init
+
+# Build Docker image and deploy:
+poetry run poe build
+poetry run poe deploy
+```
+
+### Run locally
+
+Requires the upstream services to be running (or on VPN pointing at deployed services). Set `.env.local` with the upstream URLs, then:
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. The Next.js dev server proxies `/api/workflow/*`, `/api/agent/*`, and `/api/mcp/*` to the configured upstream URLs.
+
+### View logs
+
+```bash
+poetry run poe logs
+```
+
+### Force a new revision (if image tag stays `latest`)
+
+```bash
+gcloud run services update vap-ui --image=us-central1-docker.pkg.dev/variant-processing/genomic-pipeline/vap-ui:latest --region=us-central1 --project=variant-processing
+```
+
+> **Note:** Until image tagging is updated to use git SHAs, Pulumi won't detect a rebuild because the tag hasn't changed. Use the `gcloud` command above to force Cloud Run to pull the new image.
