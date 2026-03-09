@@ -68,10 +68,8 @@ All services run on GCP, all traffic stays inside a private VPC, and the only en
 | `infra` | Pulumi (Python) — VPC, ClickHouse VM, WireGuard gateway, IAM, secrets, buckets, Artifact Registry, Firestore |
 | `variant-pipeline` | Cloud Workflow: download VCF → normalize (Cloud Batch / bcftools) → load to ClickHouse |
 | `clinvar-pipeline` | Cloud Workflow: ClinVar monthly refresh → enrich (Cloud Batch) → upsert annotations |
-| `mcp-variant-server` | Cloud Run MCP service — six structured tools over Streamable HTTP |
-| `pipeline-api` | Cloud Run FastAPI — submit and monitor pipeline runs, Firestore state tracking |
-| `variant-agent` | Cloud Run FastAPI — POST /query, Claude multi-hop reasoning loop |
-| `variant-web` | Cloud Run Next.js — pipeline dashboard, data explorer, agent chat |
+| `variant-mcp-server` | Cloud Run MCP service — six structured tools over Streamable HTTP |
+| `workflow-service` | Cloud Run FastAPI — submit and monitor pipeline runs, Firestore state tracking |
 
 ---
 

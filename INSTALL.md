@@ -1,8 +1,6 @@
 # Installation
 
-> **Work in progress.** These instructions cover the repos that are currently implemented. Additional services (MCP server, pipeline API, agent, web UI) are not yet deployed.
-
-Deploy in order: **infra → variant-pipeline → clinvar-pipeline**. Each repo depends on the one before it.
+Deploy in order: **infra → variant-pipeline → clinvar-pipeline → workflow-service**. Each repo depends on the one before it.
 
 ---
 
@@ -68,6 +66,11 @@ poetry run poe up          # apply
 
 ```bash
 poetry run poe secrets-push    # push secret values from .env into Secret Manager
+```
+
+> Wait 1–2 minutes after `poe up` for the ClickHouse VM startup script to complete before running `schema-apply`.
+
+```bash
 poetry run poe schema-apply    # create the variants and annotations tables in ClickHouse
 ```
 
@@ -95,14 +98,16 @@ Create `variant-platform.conf`:
 [Interface]
 Address = 10.10.0.2/32
 PrivateKey = <contents of ~/.wireguard/client-private.key>
-DNS = 8.8.8.8
+DNS = 10.10.0.1
 
 [Peer]
 PublicKey = <server public key — from `poe vpn-status`>
 Endpoint = <vpn_gateway_external_ip — from `poe outputs`>:51820
-AllowedIPs = 10.128.0.0/20, 10.10.0.0/24
+AllowedIPs = 10.128.0.0/20, 10.10.0.0/24, 199.36.153.4/30
 PersistentKeepalive = 25
 ```
+
+`DNS = 10.10.0.1` routes DNS through dnsmasq on the VPN gateway → Cloud DNS private zone → `*.run.app` resolves to Google's restricted VIPs, making Cloud Run internal-ingress services reachable. `199.36.153.4/30` ensures HTTPS to those VIPs routes through the tunnel.
 
 Import and activate: WireGuard app on macOS/Windows, or `sudo wg-quick up variant-platform.conf` on Linux. Verify with `ping 10.128.0.3`.
 
@@ -177,3 +182,49 @@ poetry run poe trigger -- \
 ```
 
 Add `--force-download`, `--force-load`, or `--force-enrich` to re-run individual steps independently.
+
+---
+
+## 4. workflow-service
+
+RESTful Pipeline API — submit and monitor VCF ingest and ClinVar refresh pipelines. Backed by Firestore for state and Cloud Workflows for execution.
+
+**Requires:** infra deployed, variant-pipeline and clinvar-pipeline deployed, VPN connected.
+
+### Install and deploy
+
+```bash
+cd workflow-service
+cp .env.example .env
+# Edit .env: set GCP_PROJECT, BUCKET, CLICKHOUSE_HOST
+# Set PULUMI_CONFIG_PASSPHRASE_FILE to the same passphrase file used in infra/
+# DOWNLOAD_VCF_URL is pulled automatically from the variant-pipeline stack output at deploy time
+
+poetry install
+
+# First time only:
+poetry run poe login
+poetry run poe stack-init
+
+# Build Docker image and deploy:
+poetry run poe build
+poetry run poe deploy
+```
+
+### Run locally
+
+```bash
+poetry run uvicorn src.main:app --reload --port 8080
+```
+
+### Trigger a pipeline
+
+```bash
+# VCF ingest (submits to the running local or deployed service):
+poetry run poe trigger -- --individual HG00096 --s3-vcf-uri s3://bucket/HG00096.vcf.gz
+
+# ClinVar refresh:
+curl -X POST http://localhost:8080/pipelines \
+  -H 'Content-Type: application/json' \
+  -d '{"type": "clinvar_refresh"}'
+```
