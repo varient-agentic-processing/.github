@@ -74,6 +74,10 @@ poetry run poe secrets-push    # push secret values from .env into Secret Manage
 poetry run poe schema-apply    # create the variants and annotations tables in ClickHouse
 ```
 
+```bash
+poetry run poe load-samples    # load 1000 Genomes sample metadata into Firestore (idempotent)
+```
+
 ### Connect via VPN
 
 Generate a client key pair:
@@ -394,10 +398,3 @@ Open `http://localhost:3000`. The Next.js dev server proxies `/api/workflow/*`, 
 poetry run poe logs
 ```
 
-### Force a new revision (if image tag stays `latest`)
-
-```bash
-gcloud run services update vap-ui --image=us-central1-docker.pkg.dev/variant-processing/genomic-pipeline/vap-ui:latest --region=us-central1 --project=variant-processing
-```
-
-> **Note:** Until image tagging is updated to use git SHAs, Pulumi won't detect a rebuild because the tag hasn't changed. Use the `gcloud` command above to force Cloud Run to pull the new image.
