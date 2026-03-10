@@ -180,13 +180,15 @@ Deploys the download Cloud Function, the `clinvar-refresh` Cloud Workflow, and a
 
 ### Trigger manually
 
+The easiest way is the **vap-ui Submit Pipeline → ClinVar Refresh** tab. Or via CLI:
+
 ```bash
 poetry run poe trigger -- \
   --bucket genomic-variant-prototype-variant-processing \
   --clickhouse-host 10.128.0.3
 ```
 
-Add `--force-download`, `--force-load`, or `--force-enrich` to re-run individual steps independently.
+The workflow always re-downloads from NCBI. If the VCF `##fileDate=` version matches the currently loaded version in Firestore, the pipeline returns early (`up_to_date`) without running the Batch jobs.
 
 ---
 
@@ -318,14 +320,8 @@ Returns `{"status":"ok","tools":<n>}` — the tool count confirms MCP connectivi
 
 ### Query the agent
 
-Use the interactive script at the workspace root (requires `pip install httpx`):
-
 ```bash
-# Against deployed service (must be on VPN):
-python ask.py
-
-# Against local:
-python ask.py --url http://localhost:8080
+poetry run poe ask -- --question "What pathogenic variants does HG002 have in BRCA2?"
 ```
 
 Or POST directly:
@@ -379,7 +375,7 @@ Health check: `curl http://localhost:8080/health`
 
 ## 8. vap-ui
 
-Browser-based internal tool — pipeline management, agent query, and cohort dashboard. Proxies requests to workflow-service, agent-service, and variant-mcp-server via Next.js App Router API routes (reads env vars at request time).
+Browser-based internal tool — pipeline management, agent query, cohort dashboard, and sample browser. Proxies requests to workflow-service, agent-service, variant-mcp-server, and sample-service via Next.js App Router API routes (reads env vars at request time).
 
 **Requires:** infra deployed (including `poe up` with the new `vap-ui-sa` service account), all upstream services deployed, VPN connected.
 

@@ -1,7 +1,5 @@
 # Genomic Variant Platform
 
-> **Work in progress.** This platform is under active development and not yet complete.
-
 A cloud-native genomic variant analysis platform with an agentic natural language query interface. Built on GCP, ClickHouse, and the Model Context Protocol (MCP).
 
 ---
@@ -50,14 +48,15 @@ All services run on GCP, all traffic stays inside a private VPC, and the only en
   └────────────────────────────────────────────────────────────┘
 ```
 
-**Four Cloud Run services (all `ingress: internal`):**
+**Five Cloud Run services (all `ingress: internal`):**
 
 | Service | Purpose |
 |---------|---------|
-| **Web UI** | Unified pipeline management + agent chat interface (Next.js) |
-| **Agent API** | Natural language genomic queries — Claude loop, returns cited answers |
+| **Web UI** | Unified pipeline management, agent chat, cohort dashboard, and sample browser (Next.js) |
+| **Agent API** | Natural language genomic queries — Claude reasoning loop, returns cited answers |
 | **Pipeline API** | Trigger and monitor VCF ingest and ClinVar refresh pipelines |
 | **MCP Service** | Six genomic query tools over Streamable HTTP — the agent's data interface |
+| **Sample Service** | 1000 Genomes sample metadata API — search, filter, and browse 2,504 individuals |
 
 ---
 
@@ -67,9 +66,12 @@ All services run on GCP, all traffic stays inside a private VPC, and the only en
 |------|-------------|
 | `infra` | Pulumi (Python) — VPC, ClickHouse VM, WireGuard gateway, IAM, secrets, buckets, Artifact Registry, Firestore |
 | `variant-pipeline` | Cloud Workflow: download VCF → normalize (Cloud Batch / bcftools) → load to ClickHouse |
-| `clinvar-pipeline` | Cloud Workflow: ClinVar monthly refresh → enrich (Cloud Batch) → upsert annotations |
-| `variant-mcp-server` | Cloud Run MCP service — six structured tools over Streamable HTTP |
+| `clinvar-pipeline` | Cloud Workflow: ClinVar monthly refresh → version check → enrich (Cloud Batch) → upsert annotations |
+| `variant-mcp-server` | Cloud Run MCP service — six structured genomic query tools over Streamable HTTP |
+| `agent-service` | Cloud Run FastAPI — Claude reasoning loop over MCP tools, SSE answer stream |
 | `workflow-service` | Cloud Run FastAPI — submit and monitor pipeline runs, Firestore state tracking |
+| `sample-service` | Cloud Run FastAPI — 1000 Genomes sample metadata with fuzzy search |
+| `vap-ui` | Cloud Run Next.js — pipeline management, agent query, cohort dashboard, sample browser |
 
 ---
 
