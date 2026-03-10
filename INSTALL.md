@@ -53,6 +53,7 @@ echo -n "your-passphrase" > ~/.pulumi/passphrase && chmod 600 ~/.pulumi/passphra
 ### Bootstrap and deploy
 
 ```bash
+poetry lock
 poetry install
 poetry run poe bootstrap   # creates GCS state bucket, inits the dev stack — run once
 
