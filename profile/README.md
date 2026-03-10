@@ -19,36 +19,33 @@ All services run on GCP, all traffic stays inside a private VPC, and the only en
       │
       │  WireGuard VPN
       ▼
-  ┌────────────────────────────────────────────────────────────┐
-  │  GCP VPC (internal only)                                   │
-  │                                                            │
-  │   ┌────────────┐  ┌──────────────────┐  ┌──────────────┐  │
-  │   │ Agent API  │  │ Pipeline API     │  │ Web UI       │  │
-  │   │ (Cloud Run)│  │ (Cloud Run)      │  │ (Cloud Run)  │  │
-  │   │ NL → answer│  │ submit / status  │  │ Next.js      │  │
-  │   └──────┬─────┘  └───────┬──────────┘  └──────────────┘  │
-  │          │ Streamable HTTP│ Cloud Workflows API            │
-  │   ┌──────▼──────┐         │                               │
-  │   │ MCP Service │         │                               │
-  │   │ (Cloud Run) │         │                               │
-  │   │ 6 tools     │         │                               │
-  │   └──────┬──────┘         │                               │
-  │          │ TCP 9000       │                               │
-  │   ┌──────▼────────────┐   │                               │
-  │   │ ClickHouse (GCE)  │   │                               │
-  │   │ variants           │   │                               │
-  │   │ annotations        │   │                               │
-  │   └──────▲────────────┘   │                               │
-  │          │   ┌────────────▼──────────────────────────┐    │
-  │          │   │         Cloud Workflows                │    │
-  │          ├───┤  ┌─────────────┐  ┌────────────────┐  │    │
-  │          │   │  │ VCF Ingest  │  │ ClinVar Refresh│  │    │
-  │          │   │  └─────────────┘  └────────────────┘  │    │
-  │          │   └───────────────────────────────────────┘    │
-  └────────────────────────────────────────────────────────────┘
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  GCP VPC (internal only)                                           │
+  │                                                                    │
+  │  ┌────────────┐  ┌──────────────┐  ┌─────────────┐  ┌──────────┐  │
+  │  │  Agent API │  │ Pipeline API │  │ Sample Svc  │  │  Web UI  │  │
+  │  │ (Cloud Run)│  │ (Cloud Run)  │  │ (Cloud Run) │  │ (Next.js)│  │
+  │  └──────┬─────┘  └──────┬───────┘  └──────┬──────┘  └──────────┘  │
+  │         │               │                 │                        │
+  │  ┌──────▼──────┐   ┌────▼─────────────────▼────────────────────┐  │
+  │  │ MCP Service │   │              Firestore                    │◄┐ │
+  │  │ (Cloud Run) │   │  pipeline state · samples · dash cache    │ │ │
+  │  │   6 tools   │   └───────────────────────────────────────────┘ │ │
+  │  └──────┬──────┘                                                  │ │
+  │         │ TCP 9000          ┌──────────────────────────────────┐  │ │
+  │  ┌──────▼────────────────┐  │       Stats Service              ├──┘ │
+  │  │   ClickHouse (GCE)    │◄─┤       (Cloud Run)                │    │
+  │  │ variants · annotations│  │  aggregates ClickHouse → cache   │    │
+  │  └───────────────────────┘  └──────────────▲───────────────────┘    │
+  │              ▲                             │ on completion          │
+  │    ┌─────────┴─────────────────────────────┘                        │
+  │    │       Cloud Workflows                                          │
+  │    │  VCF Ingest  │  ClinVar Refresh                               │
+  │    └────────────────────────────────────────────────────────────────┘
+  └────────────────────────────────────────────────────────────────────┘
 ```
 
-**Five Cloud Run services (all `ingress: internal`):**
+**Six Cloud Run services (all `ingress: internal`):**
 
 | Service | Purpose |
 |---------|---------|
@@ -57,6 +54,7 @@ All services run on GCP, all traffic stays inside a private VPC, and the only en
 | **Pipeline API** | Trigger and monitor VCF ingest and ClinVar refresh pipelines |
 | **MCP Service** | Six genomic query tools over Streamable HTTP — the agent's data interface |
 | **Sample Service** | 1000 Genomes sample metadata API — search, filter, and browse 2,504 individuals |
+| **Stats Service** | Pre-computes cohort dashboard aggregates from ClickHouse into Firestore for instant load |
 
 ---
 
