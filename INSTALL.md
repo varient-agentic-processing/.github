@@ -9,6 +9,7 @@ Deploy in order: **infra → variant-pipeline → clinvar-pipeline → workflow-
 Install these once, shared across all repos:
 
 - [Poetry](https://python-poetry.org/docs/#installation)
+- [poethepoet](https://github.com/nat-n/poethepoet) — task runner (`pipx install poethepoet`)
 - [Pulumi CLI](https://www.pulumi.com/docs/install/)
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) — authenticated via `gcloud auth login && gcloud auth application-default login`
 - `wireguard-tools` — for key generation (`brew install wireguard-tools` on macOS)
@@ -55,10 +56,10 @@ echo -n "your-passphrase" > ~/.pulumi/passphrase && chmod 600 ~/.pulumi/passphra
 ```bash
 poetry lock
 poetry install
-poetry run poe bootstrap   # creates GCS state bucket, inits the dev stack — run once
+poe bootstrap   # creates GCS state bucket, inits the dev stack — run once
 
-poetry run poe preview     # review what will be created
-poetry run poe up          # apply
+poe preview     # review what will be created
+poe up          # apply
 ```
 
 > After the first `poe up`, wait 1–2 minutes for GCP API activation to propagate before running it again.
@@ -66,17 +67,12 @@ poetry run poe up          # apply
 ### Post-deploy
 
 ```bash
-poetry run poe secrets-push    # push secret values from .env into Secret Manager
-```
-
-> Wait 1–2 minutes after `poe up` for the ClickHouse VM startup script to complete before running `schema-apply`.
-
-```bash
-poetry run poe schema-apply    # create the variants and annotations tables in ClickHouse
+poe secrets-push    # push secret values from .env into Secret Manager
+poe schema-apply    # create the variants and annotations tables in ClickHouse
 ```
 
 ```bash
-poetry run poe load-samples    # load 1000 Genomes sample metadata into Firestore (idempotent)
+poe load-samples    # load 1000 Genomes sample metadata into Firestore (idempotent)
 ```
 
 ### Connect via VPN
@@ -92,7 +88,7 @@ chmod 600 ~/.wireguard/client-private.key
 Register the client with the gateway:
 
 ```bash
-poetry run poe vpn-add-peer
+poe vpn-add-peer
 # Peer public key: <contents of ~/.wireguard/client-public.key>
 # VPN IP: 10.10.0.2   (use .3, .4, ... for additional users)
 ```
@@ -131,18 +127,18 @@ cd variant-pipeline
 poetry install
 
 # First time only:
-poetry run poe login        # authenticate Pulumi to the GCS backend
-poetry run poe stack-init   # init the dev stack
+poe login        # authenticate Pulumi to the GCS backend
+poe stack-init   # init the dev stack
 
 # Build Docker images and deploy:
-poetry run poe build-all
-poetry run poe deploy
+poe build-all
+poe deploy
 ```
 
 ### Trigger a run
 
 ```bash
-poetry run poe trigger -- \
+poe trigger -- \
   --individual HG00096 \
   --bucket genomic-variant-prototype-variant-processing \
   --clickhouse-host 10.128.0.3
@@ -168,12 +164,12 @@ cp .env.example .env
 poetry install
 
 # First time only:
-poetry run poe login
-poetry run poe stack-init
+poe login
+poe stack-init
 
 # Build Docker images and deploy:
-poetry run poe build-all
-poetry run poe deploy
+poe build-all
+poe deploy
 ```
 
 Deploys the download Cloud Function, the `clinvar-refresh` Cloud Workflow, and a Cloud Scheduler job (1st of each month, 06:00 UTC).
@@ -183,7 +179,7 @@ Deploys the download Cloud Function, the `clinvar-refresh` Cloud Workflow, and a
 The easiest way is the **vap-ui Submit Pipeline → ClinVar Refresh** tab. Or via CLI:
 
 ```bash
-poetry run poe trigger -- \
+poe trigger -- \
   --bucket genomic-variant-prototype-variant-processing \
   --clickhouse-host 10.128.0.3
 ```
@@ -210,12 +206,12 @@ cp .env.example .env
 poetry install
 
 # First time only:
-poetry run poe login
-poetry run poe stack-init
+poe login
+poe stack-init
 
 # Build Docker image and deploy:
-poetry run poe build
-poetry run poe deploy
+poe build
+poe deploy
 ```
 
 ### Run locally
@@ -228,7 +224,7 @@ poetry run uvicorn src.main:app --reload --port 8080
 
 ```bash
 # VCF ingest (submits to the running local or deployed service):
-poetry run poe trigger -- --individual HG00096 --s3-vcf-uri s3://bucket/HG00096.vcf.gz
+poe trigger -- --individual HG00096 --s3-vcf-uri s3://bucket/HG00096.vcf.gz
 
 # ClinVar refresh:
 curl -X POST http://localhost:8080/pipelines \
@@ -254,12 +250,12 @@ cp .env.example .env
 poetry install
 
 # First time only:
-poetry run poe login
-poetry run poe stack-init
+poe login
+poe stack-init
 
 # Build Docker image and deploy:
-poetry run poe build
-poetry run poe deploy
+poe build
+poe deploy
 ```
 
 ### Run locally
@@ -275,8 +271,8 @@ Health check: `curl http://localhost:8081/health`
 The service has `min_instance_count=1` to eliminate cold starts. Scale to zero when not in use:
 
 ```bash
-poetry run poe mcp-stop   # scale min instances to 0
-poetry run poe mcp-start  # restore min instances to 1
+poe mcp-stop   # scale min instances to 0
+poe mcp-start  # restore min instances to 1
 ```
 
 ---
@@ -300,12 +296,12 @@ cp .env.example .env
 poetry install
 
 # First time only:
-poetry run poe login
-poetry run poe stack-init
+poe login
+poe stack-init
 
 # Build Docker image and deploy:
-poetry run poe build
-poetry run poe deploy
+poe build
+poe deploy
 ```
 
 ### Run locally
@@ -321,7 +317,7 @@ Returns `{"status":"ok","tools":<n>}` — the tool count confirms MCP connectivi
 ### Query the agent
 
 ```bash
-poetry run poe ask -- --question "What pathogenic variants does HG002 have in BRCA2?"
+poe ask -- --question "What pathogenic variants does HG002 have in BRCA2?"
 ```
 
 Or POST directly:
@@ -353,12 +349,12 @@ cp .env.example .env
 poetry install
 
 # First time only:
-poetry run poe login
-poetry run poe stack-init
+poe login
+poe stack-init
 
 # Build Docker image and deploy:
-poetry run poe build
-poetry run poe deploy
+poe build
+poe deploy
 ```
 
 ### Run locally
@@ -384,7 +380,7 @@ Browser-based internal tool — pipeline management, agent query, cohort dashboa
 The `vap-ui-sa` service account was added to `infra/iam.py`. If infra was deployed before this repo existed, re-apply it:
 
 ```bash
-cd infra && poetry run poe up
+cd infra && poe up
 ```
 
 ### Install and deploy
@@ -406,12 +402,12 @@ PULUMI_CONFIG_PASSPHRASE_FILE=/path/to/passphrase-file
 poetry install
 
 # First time only:
-poetry run poe login
-poetry run poe stack-init
+poe login
+poe stack-init
 
 # Build Docker image and deploy:
-poetry run poe build
-poetry run poe deploy
+poe build
+poe deploy
 ```
 
 ### Run locally
@@ -428,6 +424,6 @@ Open `http://localhost:3000`. The Next.js dev server proxies `/api/workflow/*`, 
 ### View logs
 
 ```bash
-poetry run poe logs
+poe logs
 ```
 
